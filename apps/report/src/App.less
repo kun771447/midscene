@@ -175,6 +175,21 @@ footer.mt-8 {
         height: 20px;
       }
     }
+
+    .network-toggle-button {
+      width: auto;
+      padding: 0 8px;
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 6px;
+
+      .network-toggle-icon {
+        color: #1677ff;
+        &.collapsed {
+          color: rgba(0, 0, 0, 0.45);
+        }
+      }
+    }
   }
 }
 
@@ -262,7 +277,7 @@ footer.mt-8 {
 
   .main-side {
     box-sizing: border-box;
-    overflow-y: scroll;
+    overflow-y: auto;
     height: 100%;
   }
 

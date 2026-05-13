@@ -1,5 +1,19 @@
 import type { ReportActionDump } from '@midscene/core';
 
+export interface NetworkRequest {
+  /** Matches ExecutionTask.taskId for precise binding; falls back to timestamp range */
+  taskId?: string;
+  /** Unix timestamp in ms when the request was sent */
+  timestamp: number;
+  url: string;
+  method?: string;
+  statusCode?: number;
+  /** Duration of the request in ms */
+  duration?: number;
+  requestBody?: unknown;
+  responseBody?: unknown;
+}
+
 // Core visualization types
 export interface PlaywrightTaskAttributes {
   playwright_test_description: string;

@@ -2,7 +2,12 @@ import './App.less';
 
 import { Alert, ConfigProvider, Empty, theme } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+import {
+  type ImperativePanelHandle,
+  Panel,
+  PanelGroup,
+  PanelResizeHandle,
+} from 'react-resizable-panels';
 
 import {
   GroupedActionDump,
@@ -20,9 +25,11 @@ import {
 import DetailPanel from './components/detail-panel';
 import DetailSide from './components/detail-side';
 import GlobalHoverPreview from './components/global-hover-preview';
+import { NetworkPanel } from './components/network-panel';
 import Sidebar from './components/sidebar';
 import { type DumpStoreType, useExecutionDump } from './components/store';
 import Timeline from './components/timeline';
+import { useAllNetworkRequests } from './hooks/useNetworkRequests';
 import ThemeDarkIcon from './icons/theme-dark.svg?react';
 import ThemeLightIcon from './icons/theme-light.svg?react';
 import type {
@@ -30,7 +37,6 @@ import type {
   PlaywrightTasks,
   VisualizerProps,
 } from './types';
-import { formatModelBriefText } from './utils/model-brief';
 import {
   getEmptyDumpDescription,
   parseDumpAttributes,
@@ -67,6 +73,15 @@ let globalRenderCount = 1;
 const SIDEBAR_WIDTH_KEY = 'midscene-sidebar-width';
 const DEFAULT_SIDEBAR_WIDTH = 280;
 
+const formatModelBrief = (
+  modelBrief: ModelBrief,
+  includeIntent: boolean,
+): string => {
+  const { name, modelDescription, intent } = modelBrief;
+  const base = modelDescription ? `${name}(${modelDescription})` : name;
+  return includeIntent ? `${intent}/${base}` : `${base}`;
+};
+
 function Visualizer(props: VisualizerProps): JSX.Element {
   const { dumps } = props;
 
@@ -83,13 +98,16 @@ function Visualizer(props: VisualizerProps): JSX.Element {
   const insightHeight = useExecutionDump((store) => store.insightHeight);
   const replayAllMode = useExecutionDump((store) => store.replayAllMode);
   const setPlayingTaskId = useExecutionDump((store) => store.setPlayingTaskId);
+  const activeTask = useExecutionDump((store) => store.activeTask);
   const setGroupedDump = useExecutionDump((store) => store.setGroupedDump);
   const sdkVersion = useExecutionDump((store) => store.sdkVersion);
   const modelBriefs = useExecutionDump((store) => store.modelBriefs);
   const playwrightAttributes = useExecutionDump(
     (store) => store.playwrightAttributes,
   );
-  const modelBriefText = formatModelBriefText(modelBriefs);
+  const modelBriefText = modelBriefs
+    .map((brief) => formatModelBrief(brief, modelBriefs.length > 1))
+    .join(', ');
   const reset = useExecutionDump((store) => store.reset);
   const [mainLayoutChangeFlag, setMainLayoutChangeFlag] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -98,6 +116,10 @@ function Visualizer(props: VisualizerProps): JSX.Element {
   });
   const dump = useExecutionDump((store) => store.dump);
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
+  const networkPanelRef = useRef<ImperativePanelHandle>(null);
+  const [networkCollapsed, setNetworkCollapsed] = useState(false);
+  const networkState = useAllNetworkRequests();
+  const hasNetwork = networkState.status !== 'unavailable';
   const {
     modelCallDetailsEnabled: proModeEnabled,
     setModelCallDetailsEnabled: setProModeEnabled,
@@ -174,18 +196,44 @@ function Visualizer(props: VisualizerProps): JSX.Element {
       );
     }
     return (
-      <PanelGroup autoSaveId="page-detail-layout-v2" direction="horizontal">
-        <Panel defaultSize={75} maxSize={95}>
+      <PanelGroup autoSaveId="page-detail-layout-v3" direction="horizontal">
+        <Panel defaultSize={55} maxSize={85}>
           <div className="main-content-container">
             <DetailPanel />
           </div>
         </Panel>
         <PanelResizeHandle className="resize-handle" />
-        <Panel maxSize={95}>
+        <Panel defaultSize={hasNetwork ? 20 : 45} minSize={12} maxSize={45}>
           <div className="main-side">
             <DetailSide />
           </div>
         </Panel>
+        {hasNetwork && (
+          <>
+            <PanelResizeHandle className="resize-handle" />
+            <Panel
+              ref={networkPanelRef}
+              defaultSize={25}
+              minSize={12}
+              collapsible
+              collapsedSize={3}
+              onCollapse={() => setNetworkCollapsed(true)}
+              onExpand={() => setNetworkCollapsed(false)}
+            >
+              <NetworkPanel
+                activeTask={activeTask}
+                collapsed={networkCollapsed}
+                onToggle={() => {
+                  if (networkCollapsed) {
+                    networkPanelRef.current?.expand();
+                  } else {
+                    networkPanelRef.current?.collapse();
+                  }
+                }}
+              />
+            </Panel>
+          </>
+        )}
       </PanelGroup>
     );
   };
@@ -330,7 +378,7 @@ function Visualizer(props: VisualizerProps): JSX.Element {
           </div>
           <div className="page-nav-right">
             <div className="page-nav-version">
-              {sdkVersion ? `v${sdkVersion}` : 'unknown version'}
+              v{sdkVersion}
               {modelBriefText ? ` | ${modelBriefText}` : ''}
             </div>
             <div className="theme-divider" />
